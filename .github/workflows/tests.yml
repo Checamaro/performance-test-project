@@ -166,18 +166,18 @@ for i in range(5):
     status = test_endpoint()
     if status == 200:
         successes += 1
-        print(f'Request {i+1}: ✓ SUCCESS')
+        print(f'Request {i+1}: SUCCESS')
     else:
-        print(f'Request {i+1}: ✗ FAILED (Status: {status})')
+        print(f'Request {i+1}: FAILED (Status: {status})')
     time.sleep(1)
 
 duration = time.time() - start_time
 print(f'Results: {successes}/5 successful')
 
 if successes >= 3:
-    print('✓ Performance test PASSED')
+    print('Performance test PASSED')
 else:
-    print('✗ Performance test FAILED')
+    print('Performance test FAILED')
     exit(1)
 "
 
@@ -200,7 +200,7 @@ else:
       run: |
         echo "Checking downloaded Allure report..."
         if [ -d "allure-report" ] && [ "$(ls -A allure-report)" ]; then
-          echo "✓ Allure report downloaded successfully"
+          echo "Allure report downloaded successfully"
           ls -la allure-report/
         else
           echo "Allure report not found, creating placeholder"
@@ -225,7 +225,7 @@ else:
 </body>
 </html>
 EOF
-          echo "✓ Placeholder report created"
+          echo "Placeholder report created"
         fi
 
     - name: Setup Pages
