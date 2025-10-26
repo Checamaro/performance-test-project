@@ -196,13 +196,11 @@ jobs:
             echo "Found Allure summary data"
             
             # Парсим JSON с результатами
-            STATS=$(cat pr-allure-report/widgets/summary.json)
-            
-            TOTAL=$(echo "$STATS" | grep -o '"total":[0-9]*' | cut -d: -f2)
-            PASSED=$(echo "$STATS" | grep -o '"passed":[0-9]*' | cut -d: -f2)
-            FAILED=$(echo "$STATS" | grep -o '"failed":[0-9]*' | cut -d: -f2)
-            BROKEN=$(echo "$STATS" | grep -o '"broken":[0-9]*' | cut -d: -f2)
-            SKIPPED=$(echo "$STATS" | grep -o '"skipped":[0-9]*' | cut -d: -f2)
+            TOTAL=$(grep -o '"total":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
+            PASSED=$(grep -o '"passed":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
+            FAILED=$(grep -o '"failed":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
+            BROKEN=$(grep -o '"broken":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
+            SKIPPED=$(grep -o '"skipped":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
             
             # Создаем красивый комментарий
             cat > pr-comment.md << EOF
@@ -216,13 +214,13 @@ jobs:
             - 📈 **Total:** ${TOTAL:-0}
 
             ### Performance Tests
-            - ✅ **Status:** ${{ needs.performance.result == 'success' && 'PASSED' : 'FAILED' }}
+            - ✅ **Status:** $([ "${{ needs.performance.result }}" = "success" ] && echo "PASSED" || echo "FAILED")
 
             ### 📎 Artifacts
             - [Download Full Allure Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
             - [View Test Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
-            ${{ needs.api.result == 'success' && needs.performance.result == 'success' && '🎉 **All tests passed! Ready for review.**' : '❌ **Some tests failed. Please check the report.**' }}
+            $([ "${{ needs.api.result }}" = "success" ] && [ "${{ needs.performance.result }}" = "success" ] && echo "🎉 **All tests passed! Ready for review.**" || echo "❌ **Some tests failed. Please check the report.**")
             EOF
           else
             # Если отчета нет
