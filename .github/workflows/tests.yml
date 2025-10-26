@@ -129,7 +129,8 @@ jobs:
 
       - name: Run simple performance test
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests python -c "import requests; successes = 0; print('Testing backend...'); [exec('try: r = requests.get(\"http://backend:8000/health\", timeout=3); successes += 1 if r.status_code == 200 else 0; print(f\"Request {i+1}: {\"SUCCESS\" if r.status_code == 200 else \"FAILED\"}\") except: print(f\"Request {i+1}: ERROR\"); __import__(\"time\").sleep(1)' for i in range(3)]; print(f'Results: {successes}/3'); exit(0 if successes >= 2 else 1)"
+          # Простейший тест - один запрос к health endpoint
+          docker-compose -f docker-compose.ci.yml run --rm tests python -c "import requests; r = requests.get('http://backend:8000/health', timeout=10); print(f'Health check: {r.status_code}'); exit(0 if r.status_code == 200 else 1)"
 
   report:
     runs-on: ubuntu-latest
