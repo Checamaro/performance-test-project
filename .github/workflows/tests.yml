@@ -118,35 +118,9 @@ jobs:
           sleep 30
           docker-compose -f docker-compose.ci.yml ps
 
-      - name: Run Locust performance test
+      - name: Run simple performance test
         run: |
-          # Запускаем Locust в фоне
-          docker-compose -f docker-compose.ci.yml up -d locust
-          sleep 10
-          
-          # Запускаем тесты через Locust
-          docker-compose -f docker-compose.ci.yml run --rm tests python -c "
-import time
-import requests
-from locust import HttpUser, task, between
-import random
-
-class QuickTestUser(HttpUser):
-    wait_time = between(1, 2)
-    host = 'http://backend:8000'
-    
-    @task
-    def test_health(self):
-        self.client.get('/health')
-
-# Быстрый тест для генерации результатов
-print('Running quick Locust test...')
-"
-
-      - name: Upload Locust results
-        if: always()
-        run: |
-          echo "Locust performance tests completed"
+          docker-compose -f docker-compose.ci.yml run --rm tests python -c "import requests; import time; successes = 0; start_time = time.time(); print('Testing backend availability...'); [exec('try: response = requests.get(\\\"http://backend:8000/health\\\", timeout=5); print(\\\"Request {}: SUCCESS\\\".format(i+1) if response.status_code == 200 else \\\"Request {}: FAILED (Status: {})\\\".format(i+1, response.status_code)); successes += 1 if response.status_code == 200 else 0; except: print(\\\"Request {}: FAILED (Connection error)\\\".format(i+1)); time.sleep(1)') for i in range(5)]; duration = time.time() - start_time; print('Results: {}/5 successful'.format(successes)); print('Performance test PASSED' if successes >= 3 else 'Performance test FAILED'); exit(0 if successes >= 3 else 1)"
 
   report:
     runs-on: ubuntu-latest
@@ -173,29 +147,8 @@ print('Running quick Locust test...')
           else
             echo "Creating basic Allure report structure..."
             mkdir -p allure-report/data
-            cat > allure-report/index.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Allure Report</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 5px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Allure Test Report</h1>
-        <div class="warning">
-            <h2>Report Not Fully Generated</h2>
-            <p>Full Allure report with charts and graphs is only available when tests generate proper Allure results.</p>
-            <p>To get full report, ensure tests are run with <code>--alluredir</code> parameter.</p>
-        </div>
-    </div>
-</body>
-</html>
-EOF
+            echo '<!DOCTYPE html><html><head><title>Allure Report</title><style>body{font-family:Arial,sans-serif;margin:40px}.container{max-width:800px;margin:0 auto}.warning{background:#fff3cd;border:1px solid #ffeaa7;padding:20px;border-radius:5px}</style></head><body><div class="container"><h1>Allure Test Report</h1><div class="warning"><h2>Report Not Fully Generated</h2><p>Full Allure report with charts and graphs is only available when tests generate proper Allure results.</p><p>To get full report, ensure tests are run with <code>--alluredir</code> parameter.</p></div></div></body></html>' > allure-report/index.html
+            echo "Placeholder report created"
           fi
 
       - name: Setup Pages
