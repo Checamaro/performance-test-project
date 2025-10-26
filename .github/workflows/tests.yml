@@ -61,28 +61,17 @@ jobs:
 
       - name: Run API tests and generate Allure report
         run: |
-          # Запускаем тесты и генерируем отчет в одном контейнере
           mkdir -p allure-report
           docker-compose -f docker-compose.ci.yml run --rm -v $(pwd)/allure-report:/host-report tests bash -c "
-            echo 'Running API tests with Allure...'
             python -m pytest api/ -v --alluredir=/tmp/allure-results
-            
-            echo 'Checking if Allure results were created...'
             if [ -d '/tmp/allure-results' ] && [ \"\$(ls -A /tmp/allure-results)\" ]; then
-              echo 'Generating Allure report...'
               allure generate /tmp/allure-results -o /tmp/allure-report --clean
-              echo 'Copying Allure report to host...'
               cp -r /tmp/allure-report/* /host-report/
-              echo 'Allure report generated and copied successfully'
             else
-              echo 'No Allure results found, creating basic report...'
               mkdir -p /host-report
               echo '<html><body><h1>Test Report</h1><p>No test results available</p></body></html>' > /host-report/index.html
             fi
           "
-          
-          echo "Allure report contents on host:"
-          ls -la allure-report/
 
       - name: Upload Allure report as artifact
         uses: actions/upload-artifact@v4
@@ -95,8 +84,7 @@ jobs:
         if: always()
         run: |
           docker-compose -f docker-compose.ci.yml logs > docker-compose-logs.txt
-          echo "Backend Logs" > detailed-logs.txt
-          docker-compose -f docker-compose.ci.yml logs backend >> detailed-logs.txt
+          docker-compose -f docker-compose.ci.yml logs backend > backend-logs.txt
 
       - name: Upload service logs
         if: always()
@@ -105,7 +93,7 @@ jobs:
           name: service-logs-${{ github.event.pull_request.number || github.sha }}
           path: |
             docker-compose-logs.txt
-            detailed-logs.txt
+            backend-logs.txt
           retention-days: 7
 
   performance:
@@ -126,14 +114,11 @@ jobs:
         run: |
           docker-compose -f docker-compose.ci.yml up -d
           sleep 30
-          docker-compose -f docker-compose.ci.yml ps
 
       - name: Run simple performance test
         run: |
-          # Простейший тест - один запрос к health endpoint
           docker-compose -f docker-compose.ci.yml run --rm tests python -c "import requests; r = requests.get('http://backend:8000/health', timeout=10); print(f'Health check: {r.status_code}'); exit(0 if r.status_code == 200 else 1)"
 
-  # Деплой отчета на GitHub Pages только для main ветки
   deploy-main-report:
     runs-on: ubuntu-latest
     needs: [api, performance]
@@ -169,7 +154,6 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  # Комментарий с отчетом для pull request'ов
   pr-report-comment:
     runs-on: ubuntu-latest
     needs: [api, performance]
@@ -187,65 +171,35 @@ jobs:
           name: allure-report-${{ github.event.pull_request.number }}
           path: ./pr-allure-report
 
-      - name: Create summary report for PR
+      - name: Create PR comment
         run: |
-          echo "Creating PR test summary..."
+          # Создаем базовый комментарий
+          echo "## 📊 Test Results Summary" > pr-comment.md
+          echo "" >> pr-comment.md
+          echo "### Test Status" >> pr-comment.md
+          echo "- API Tests: ${{ needs.api.result }}" >> pr-comment.md
+          echo "- Performance Tests: ${{ needs.performance.result }}" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo "### 📎 Artifacts" >> pr-comment.md
+          echo "- [Download Full Allure Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> pr-comment.md
+          echo "- [View Test Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> pr-comment.md
+          echo "" >> pr-comment.md
           
-          # Проверяем есть ли отчет
-          if [ -f "pr-allure-report/widgets/summary.json" ]; then
-            echo "Found Allure summary data"
-            
-            # Парсим JSON с результатами
-            TOTAL=$(grep -o '"total":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
-            PASSED=$(grep -o '"passed":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
-            FAILED=$(grep -o '"failed":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
-            BROKEN=$(grep -o '"broken":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
-            SKIPPED=$(grep -o '"skipped":[0-9]*' pr-allure-report/widgets/summary.json | cut -d: -f2 | head -1)
-            
-            # Создаем красивый комментарий
-            cat > pr-comment.md << EOF
-            ## 📊 Test Results Summary
-
-            ### API Tests
-            - ✅ **Passed:** ${PASSED:-0}
-            - ❌ **Failed:** ${FAILED:-0}
-            - ⚠️ **Broken:** ${BROKEN:-0}
-            - ⏭️ **Skipped:** ${SKIPPED:-0}
-            - 📈 **Total:** ${TOTAL:-0}
-
-            ### Performance Tests
-            - ✅ **Status:** $([ "${{ needs.performance.result }}" = "success" ] && echo "PASSED" || echo "FAILED")
-
-            ### 📎 Artifacts
-            - [Download Full Allure Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - [View Test Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-            $([ "${{ needs.api.result }}" = "success" ] && [ "${{ needs.performance.result }}" = "success" ] && echo "🎉 **All tests passed! Ready for review.**" || echo "❌ **Some tests failed. Please check the report.**")
-            EOF
+          # Добавляем статус
+          if [ "${{ needs.api.result }}" = "success" ] && [ "${{ needs.performance.result }}" = "success" ]; then
+            echo "🎉 **All tests passed! Ready for review.**" >> pr-comment.md
           else
-            # Если отчета нет
-            cat > pr-comment.md << EOF
-            ## 📊 Test Results Summary
-
-            ### Status
-            - API Tests: ${{ needs.api.result }}
-            - Performance Tests: ${{ needs.performance.result }}
-
-            ### 📎 Artifacts  
-            - [View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-            ℹ️ *Full test report is not available. Check workflow logs for details.*
-            EOF
+            echo "❌ **Some tests failed. Please check the report.**" >> pr-comment.md
           fi
 
-      - name: Add or update PR comment
+      - name: Add PR comment
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const commentBody = fs.readFileSync('./pr-comment.md', 'utf8');
             
-            // Ищем существующий комментарий от этого workflow
+            // Ищем существующий комментарий
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
