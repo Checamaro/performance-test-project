@@ -10,7 +10,7 @@ env:
   DOCKER_COMPOSE_VERSION: v2.24.5
 
 jobs:
-  test:
+  api:  # ← ПЕРЕИМЕНОВАЛИ ИЗ test В api
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -31,20 +31,17 @@ jobs:
     - name: Start services with simple waiting
       run: |
         docker-compose -f docker-compose.ci.yml up -d
-        
         echo "Waiting for services to start..."
-        # Просто ждем 30 секунд вместо сложных health checks
         sleep 30
         
         echo "Checking services status..."
         docker-compose -f docker-compose.ci.yml ps
         
         echo "Backend logs:"
-        docker-compose -f docker-compose.ci.yml logs backend --tail=50
+        docker-compose -f docker-compose.ci.yml logs backend --tail=20
 
     - name: Check backend availability
       run: |
-        # Простая проверка - пытаемся достучаться до бэкенда
         for i in {1..10}; do
           if curl -s http://localhost:8000/health > /dev/null; then
             echo "✓ Backend is responding!"
@@ -53,13 +50,9 @@ jobs:
           echo "Waiting for backend... ($i/10)"
           sleep 5
         done
-        
-        # Даже если health check не прошел, продолжаем
-        echo "Proceeding with tests..."
 
     - name: Initialize database
       run: |
-        # Пытаемся инициализировать БД, но не падаем при ошибке
         docker-compose -f docker-compose.ci.yml exec backend python -c "
         try:
             from database.database import engine
@@ -72,19 +65,26 @@ jobs:
 
     - name: Run API tests
       run: |
-        # Запускаем тесты даже если бэкенд не идеален
-        docker-compose -f docker-compose.ci.yml run --rm tests python -m pytest api/ -v --alluredir=/tmp/allure-results || echo "Some tests failed"
+        docker-compose -f docker-compose.ci.yml run --rm tests python -m pytest api/ -v --alluredir=/tmp/allure-results
+
+    - name: Check if Allure results exist
+      run: |
+        echo "Checking Allure results..."
+        docker-compose -f docker-compose.ci.yml run --rm tests ls -la /tmp/allure-results/ || echo "No allure results directory"
 
     - name: Generate Allure report
       run: |
+        echo "Generating Allure report..."
         mkdir -p allure-report
-        # Пытаемся сгенерировать отчет
-        docker-compose -f docker-compose.ci.yml run --rm tests allure generate /tmp/allure-results -o /tmp/allure-report --clean 2>/dev/null || \
-        echo "Allure report generation failed, creating placeholder"
         
-        # Копируем если получилось
-        docker cp $(docker-compose -f docker-compose.ci.yml ps -q tests):/tmp/allure-report/. allure-report/ 2>/dev/null || \
-        mkdir -p allure-report
+        # Генерируем отчет внутри контейнера tests
+        docker-compose -f docker-compose.ci.yml run --rm tests allure generate /tmp/allure-results -o /tmp/allure-report --clean
+        
+        # Копируем отчет из контейнера на хост
+        docker cp $(docker-compose -f docker-compose.ci.yml ps -q tests):/tmp/allure-report/. allure-report/
+        
+        echo "Allure report contents:"
+        ls -la allure-report/
 
     - name: Upload Allure report
       uses: actions/upload-artifact@v4
@@ -112,7 +112,7 @@ jobs:
 
   performance:
     runs-on: ubuntu-latest
-    needs: test
+    needs: api  # ← ИЗМЕНИЛИ С test НА api
     timeout-minutes: 30
 
     steps:
@@ -132,7 +132,6 @@ jobs:
 
     - name: Run simple performance test
       run: |
-        # Упрощенный тест производительности
         docker-compose -f docker-compose.ci.yml run --rm tests python -c "
         import requests
         import time
@@ -170,18 +169,49 @@ jobs:
 
   report:
     runs-on: ubuntu-latest
-    needs: [test, performance]
+    needs: [api, performance]  # ← ИЗМЕНИЛИ С test НА api
     if: always()
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Download Allure report
+    - name: Download Allure report artifact
       uses: actions/download-artifact@v4
       with:
         name: allure-report
         path: allure-report
+
+    - name: Verify Allure report download
+      run: |
+        echo "Checking downloaded Allure report..."
+        if [ -d "allure-report" ]; then
+          echo "✓ Allure report downloaded successfully"
+          ls -la allure-report/
+        else
+          echo "✗ Allure report not found, creating placeholder"
+          mkdir -p allure-report
+          cat > allure-report/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Test Report - No Data</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+                  .error { color: #d63384; background-color: #f8d7da; padding: 20px; border-radius: 5px; }
+              </style>
+          </head>
+          <body>
+              <h1>API Test Report</h1>
+              <div class="error">
+                  <h2>No Test Results Available</h2>
+                  <p>Allure report was not generated during test execution.</p>
+                  <p>Check the workflow logs for details.</p>
+              </div>
+          </body>
+          </html>
+          EOF
+        fi
 
     - name: Setup Pages
       uses: actions/configure-pages@v4
