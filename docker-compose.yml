@@ -5,10 +5,7 @@ services:
       POSTGRES_DB: auth_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    # В CI не мапим порты чтобы избежать конфликтов
     networks:
       - app-network
 
@@ -27,32 +24,19 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    ports:
-      - "9092:9092"
     networks:
       - app-network
 
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "8000:8000"  # Оставляем только бэкенд порт
     environment:
       DATABASE_URL: postgresql://user:password@postgres:5432/auth_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       - postgres
       - kafka
-    networks:
-      - app-network
-    volumes:
-      - ./backend:/app
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
     networks:
       - app-network
 
@@ -62,77 +46,8 @@ services:
       - backend
     networks:
       - app-network
-    volumes:
-      - ./tests:/tests
-      - allure-results:/tmp/allure-results
-
-  locust:
-    image: locustio/locust:2.20.0
-    ports:
-      - "8089:8089"
-    volumes:
-      - ./tests/performance:/mnt/locust
-    command: -f /mnt/locust/locustfile.py --host=http://backend:8000
-    depends_on:
-      - backend
-    networks:
-      - app-network
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9091:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    networks:
-      - app-network
-    depends_on:
-      - backend
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    networks:
-      - app-network
-    depends_on:
-      - prometheus
-
-  node-exporter:
-    image: prom/node-exporter:latest
-    ports:
-      - "9100:9100"
-    networks:
-      - app-network
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-
-volumes:
-  postgres_data:
-  allure-results:
-  prometheus_data:
-  grafana_data:
+      TEST_BASE_URL: http://backend:8000
 
 networks:
   app-network:
