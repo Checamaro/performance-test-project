@@ -1,0 +1,9 @@
+pytest==7.4.0
+pytest-asyncio==0.21.0
+requests==2.31.0
+locust==2.20.0
+allure-pytest==2.13.2
+allure-python-commons==2.13.2
+pydantic==1.10.12
+faker==19.6.2
+python-dotenv==1.0.0
