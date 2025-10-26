@@ -1,11 +1,11 @@
----
 name: Run Tests and Generate Reports
 
 on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+    types: [opened, synchronize, reopened]
 
 jobs:
   api:
@@ -61,51 +61,40 @@ jobs:
 
       - name: Run API tests and generate Allure report
         run: |
-          # Запускаем тесты и генерируем отчет в одном контейнере
           mkdir -p allure-report
           docker-compose -f docker-compose.ci.yml run --rm -v $(pwd)/allure-report:/host-report tests bash -c "
-            echo 'Running API tests with Allure...'
             python -m pytest api/ -v --alluredir=/tmp/allure-results
-            
-            echo 'Checking if Allure results were created...'
             if [ -d '/tmp/allure-results' ] && [ \"\$(ls -A /tmp/allure-results)\" ]; then
-              echo 'Generating Allure report...'
               allure generate /tmp/allure-results -o /tmp/allure-report --clean
-              echo 'Copying Allure report to host...'
               cp -r /tmp/allure-report/* /host-report/
-              echo 'Allure report generated and copied successfully'
             else
-              echo 'No Allure results found, creating basic report...'
+              mkdir -p /host-report
               echo '<html><body><h1>Test Report</h1><p>No test results available</p></body></html>' > /host-report/index.html
             fi
           "
-          
-          echo "Allure report contents on host:"
-          ls -la allure-report/
 
-      - name: Upload Allure report
+      - name: Upload Allure report as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: allure-report
+          name: allure-report-${{ github.event.pull_request.number || github.sha }}
           path: allure-report/
-          retention-days: 30
+          retention-days: 7
 
       - name: Save and upload service logs
         if: always()
         run: |
           docker-compose -f docker-compose.ci.yml logs > docker-compose-logs.txt
-          echo "Backend Logs" > detailed-logs.txt
-          docker-compose -f docker-compose.ci.yml logs backend >> detailed-logs.txt
+          docker-compose -f docker-compose.ci.yml logs backend > backend-logs.txt
 
       - name: Upload service logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: service-logs
+          name: service-logs-${{ github.event.pull_request.number || github.sha }}
           path: |
             docker-compose-logs.txt
-            detailed-logs.txt
-          retention-days: 30
+            backend-logs.txt
+          retention-days: 7
 
   performance:
     runs-on: ubuntu-latest
@@ -125,17 +114,23 @@ jobs:
         run: |
           docker-compose -f docker-compose.ci.yml up -d
           sleep 30
-          docker-compose -f docker-compose.ci.yml ps
 
       - name: Run simple performance test
         run: |
-          # Простейший тест - один запрос к health endpoint
           docker-compose -f docker-compose.ci.yml run --rm tests python -c "import requests; r = requests.get('http://backend:8000/health', timeout=10); print(f'Health check: {r.status_code}'); exit(0 if r.status_code == 200 else 1)"
 
-  report:
+  deploy-main-report:
     runs-on: ubuntu-latest
     needs: [api, performance]
-    if: always()
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout code
@@ -144,34 +139,92 @@ jobs:
       - name: Download Allure report artifact
         uses: actions/download-artifact@v4
         with:
-          name: allure-report
-          path: allure-report
-
-      - name: Verify and prepare Allure report
-        run: |
-          echo "Checking Allure report..."
-          if [ -d "allure-report" ] && [ -f "allure-report/index.html" ]; then
-            echo "✓ Full Allure report with charts is ready"
-            echo "Report contents:"
-            find allure-report -type f | head -10
-          else
-            echo "Allure report not found, creating basic report..."
-            mkdir -p allure-report
-            echo '<!DOCTYPE html><html><head><title>Allure Report</title><style>body{font-family:Arial,sans-serif;margin:40px}.container{max-width:800px;margin:0 auto}.warning{background:#fff3cd;border:1px solid #ffeaa7;padding:20px;border-radius:5px}</style></head><body><div class="container"><h1>Allure Test Report</h1><div class="warning"><h2>Report Not Available</h2><p>Full Allure report could not be generated in this run.</p><p>Check workflow logs for test results.</p></div></div></body></html>' > allure-report/index.html
-            echo "Basic report created"
-          fi
+          name: allure-report-${{ github.sha }}
+          path: ./_site
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        if: github.ref == 'refs/heads/main'
 
-      - name: Upload to GitHub Pages
+      - name: Upload to Pages
         uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
         with:
-          path: allure-report
+          path: ./_site
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        if: github.ref == 'refs/heads/main'
+
+  pr-report-comment:
+    runs-on: ubuntu-latest
+    needs: [api, performance]
+    if: github.event_name == 'pull_request' && always()
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Allure report
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-report-${{ github.event.pull_request.number }}
+          path: ./pr-allure-report
+
+      - name: Create PR comment
+        run: |
+          # Создаем базовый комментарий
+          echo "## 📊 Test Results Summary" > pr-comment.md
+          echo "" >> pr-comment.md
+          echo "### Test Status" >> pr-comment.md
+          echo "- API Tests: ${{ needs.api.result }}" >> pr-comment.md
+          echo "- Performance Tests: ${{ needs.performance.result }}" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo "### 📎 Artifacts" >> pr-comment.md
+          echo "- [Download Full Allure Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> pr-comment.md
+          echo "- [View Test Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> pr-comment.md
+          echo "" >> pr-comment.md
+          
+          # Добавляем статус
+          if [ "${{ needs.api.result }}" = "success" ] && [ "${{ needs.performance.result }}" = "success" ]; then
+            echo "🎉 **All tests passed! Ready for review.**" >> pr-comment.md
+          else
+            echo "❌ **Some tests failed. Please check the report.**" >> pr-comment.md
+          fi
+
+      - name: Add PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const commentBody = fs.readFileSync('./pr-comment.md', 'utf8');
+            
+            // Ищем существующий комментарий
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Test Results Summary')
+            );
+            
+            if (botComment) {
+              // Обновляем существующий комментарий
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              // Создаем новый комментарий
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: commentBody
+              });
+            }
