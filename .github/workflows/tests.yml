@@ -75,9 +75,12 @@ jobs:
         if: always()
         run: |
           mkdir -p allure-report
-          echo "<html><body><h1>API Test Report</h1>" > allure-report/index.html
-          echo "<p>Tests executed successfully in CI environment.</p>" >> allure-report/index.html
-          echo "<p>For detailed reports, run tests locally.</p>" >> allure-report/index.html
+          echo "<html><body><h1>API Test Report</h1>" \
+            > allure-report/index.html
+          echo "<p>Tests executed successfully.</p>" \
+            >> allure-report/index.html
+          echo "<p>For detailed reports, run locally.</p>" \
+            >> allure-report/index.html
           echo "</body></html>" >> allure-report/index.html
           echo "Simple test report created"
 
@@ -131,39 +134,8 @@ jobs:
 
       - name: Run simple performance test
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests python -c "
-import requests
-import time
-
-def test_endpoint():
-    try:
-        response = requests.get('http://backend:8000/health', timeout=5)
-        return response.status_code
-    except:
-        return 0
-
-print('Testing backend availability...')
-successes = 0
-start_time = time.time()
-
-for i in range(5):
-    status = test_endpoint()
-    if status == 200:
-        successes += 1
-        print(f'Request {i+1}: SUCCESS')
-    else:
-        print(f'Request {i+1}: FAILED (Status: {status})')
-    time.sleep(1)
-
-duration = time.time() - start_time
-print(f'Results: {successes}/5 successful')
-
-if successes >= 3:
-    print('Performance test PASSED')
-else:
-    print('Performance test FAILED')
-    exit(1)
-"
+          docker-compose -f docker-compose.ci.yml run --rm tests \
+            python -c "import requests; import time; successes = 0; start_time = time.time(); print('Testing backend availability...'); [exec(\"status = requests.get('http://backend:8000/health', timeout=5).status_code if requests.get('http://backend:8000/health', timeout=5).status_code == 200 else 0; print('Request ' + str(i+1) + ': SUCCESS' if status == 200 else 'Request ' + str(i+1) + ': FAILED (Status: ' + str(status) + ')'); successes += 1 if status == 200 else 0; time.sleep(1)\") for i in range(5)]; duration = time.time() - start_time; print('Results: ' + str(successes) + '/5 successful'); print('Performance test PASSED' if successes >= 3 else 'Performance test FAILED'); exit(0 if successes >= 3 else 1)"
 
   report:
     runs-on: ubuntu-latest
@@ -189,8 +161,10 @@ else:
           else
             echo "Allure report not found, creating placeholder"
             mkdir -p allure-report
-            echo "<html><body><h1>Test Report</h1>" > allure-report/index.html
-            echo "<p>No test results available.</p>" >> allure-report/index.html
+            echo "<html><body><h1>Test Report</h1>" \
+              > allure-report/index.html
+            echo "<p>No test results available.</p>" \
+              >> allure-report/index.html
             echo "</body></html>" >> allure-report/index.html
             echo "Placeholder report created"
           fi
