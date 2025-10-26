@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_HOST_AUTH_METHOD: trust
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d auth_db"]
+      test: [ "CMD-SHELL", "pg_isready -U user -d auth_db" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -62,6 +62,18 @@ services:
       TEST_BASE_URL: http://backend:8000
       DATABASE_URL: postgresql://user:password@postgres:5432/auth_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  locust:
+    image: locustio/locust:2.20.0
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./tests/performance:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --host=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - app-network
 
 networks:
   app-network:
