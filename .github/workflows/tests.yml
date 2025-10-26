@@ -7,9 +7,6 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  DOCKER_COMPOSE_VERSION: v2.24.5
-
 jobs:
   api:
     runs-on: ubuntu-latest
@@ -19,11 +16,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/${{ env.DOCKER_COMPOSE_VERSION }}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
+      - name: Setup Docker Compose
+        uses: docker/setup-compose-action@v3
 
       - name: Build services
         run: |
@@ -71,12 +65,9 @@ jobs:
         if: always()
         run: |
           mkdir -p allure-report
-          echo "<html><body><h1>API Test Report</h1>" \
-            > allure-report/index.html
-          echo "<p>Tests executed successfully.</p>" \
-            >> allure-report/index.html
-          echo "<p>For detailed reports, run locally.</p>" \
-            >> allure-report/index.html
+          echo "<html><body><h1>API Test Report</h1>" > allure-report/index.html
+          echo "<p>Tests executed successfully.</p>" >> allure-report/index.html
+          echo "<p>For detailed reports, run locally.</p>" >> allure-report/index.html
           echo "</body></html>" >> allure-report/index.html
           echo "Simple test report created"
 
@@ -113,10 +104,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/${{ env.DOCKER_COMPOSE_VERSION }}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
+      - name: Setup Docker Compose
+        uses: docker/setup-compose-action@v3
 
       - name: Start services for performance tests
         run: |
@@ -126,8 +115,33 @@ jobs:
 
       - name: Run simple performance test
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests \
-            python -c "import requests; import time; successes = 0; start_time = time.time(); print('Testing backend availability...'); [exec(\"status = requests.get('http://backend:8000/health', timeout=5).status_code if requests.get('http://backend:8000/health', timeout=5).status_code == 200 else 0; print('Request ' + str(i+1) + ': SUCCESS' if status == 200 else 'Request ' + str(i+1) + ': FAILED (Status: ' + str(status) + ')'); successes += 1 if status == 200 else 0; time.sleep(1)\") for i in range(5)]; duration = time.time() - start_time; print('Results: ' + str(successes) + '/5 successful'); print('Performance test PASSED' if successes >= 3 else 'Performance test FAILED'); exit(0 if successes >= 3 else 1)"
+          docker-compose -f docker-compose.ci.yml run --rm tests bash -c "
+          python -c \"
+          import requests
+          import time
+          successes = 0
+          start_time = time.time()
+          print('Testing backend availability...')
+          for i in range(5):
+              try:
+                  response = requests.get('http://backend:8000/health', timeout=5)
+                  if response.status_code == 200:
+                      successes += 1
+                      print('Request ' + str(i+1) + ': SUCCESS')
+                  else:
+                      print('Request ' + str(i+1) + ': FAILED (Status: ' + str(response.status_code) + ')')
+              except:
+                  print('Request ' + str(i+1) + ': FAILED (Connection error)')
+              time.sleep(1)
+          duration = time.time() - start_time
+          print('Results: ' + str(successes) + '/5 successful')
+          if successes >= 3:
+              print('Performance test PASSED')
+          else:
+              print('Performance test FAILED')
+              exit(1)
+          \"
+          "
 
   report:
     runs-on: ubuntu-latest
@@ -153,10 +167,8 @@ jobs:
           else
             echo "Allure report not found, creating placeholder"
             mkdir -p allure-report
-            echo "<html><body><h1>Test Report</h1>" \
-              > allure-report/index.html
-            echo "<p>No test results available.</p>" \
-              >> allure-report/index.html
+            echo "<html><body><h1>Test Report</h1>" > allure-report/index.html
+            echo "<p>No test results available.</p>" >> allure-report/index.html
             echo "</body></html>" >> allure-report/index.html
             echo "Placeholder report created"
           fi
