@@ -5,7 +5,12 @@ services:
       POSTGRES_DB: auth_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    # В CI не мапим порты чтобы избежать конфликтов
+      POSTGRES_HOST_AUTH_METHOD: trust  # Добавляем для упрощения
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - app-network
 
@@ -30,20 +35,27 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"  # Оставляем только бэкенд порт
+      - "8000:8000"
     environment:
       DATABASE_URL: postgresql://user:password@postgres:5432/auth_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       - postgres
       - kafka
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - app-network
 
   tests:
     build: ./tests
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - app-network
     environment:
