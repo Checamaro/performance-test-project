@@ -34,7 +34,6 @@ jobs:
 
       kafka:
         image: confluentinc/cp-kafka:7.0.0
-        depends-on: zookeeper
         env:
           KAFKA_ZOOKEEPER_CONNECT: localhost:2181
           KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
@@ -108,7 +107,6 @@ jobs:
 
       kafka:
         image: confluentinc/cp-kafka:7.0.0
-        depends-on: zookeeper
         env:
           KAFKA_ZOOKEEPER_CONNECT: localhost:2181
           KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
