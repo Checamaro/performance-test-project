@@ -119,6 +119,31 @@ async def metrics():
     return Response(get_metrics(), media_type="text/plain")
 
 
+@app.post("/register-simple")
+async def register_simple(user_data: dict):
+    """
+    Упрощенный эндпоинт для регистрации для нагрузочного тестирования
+    Без Kafka и сложных зависимостей
+    """
+    try:
+        email = user_data.get("email")
+        password = user_data.get("password")
+
+        if not email or not password:
+            return {"error": "Email and password required"}, 400
+
+        # Простая проверка - всегда возвращаем успех для тестирования
+        return {
+            "message": "User registered successfully",
+            "email": email,
+            "status": "active"
+        }
+
+    except Exception as e:
+        logger.error(f"Simple registration error: {e}")
+        return {"error": "Registration failed"}, 500
+
+
 @app.post("/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     try:
