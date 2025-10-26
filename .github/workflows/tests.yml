@@ -21,17 +21,17 @@ jobs:
 
       - name: Build services
         run: |
-          docker-compose -f docker-compose.ci.yml build backend tests
+          docker compose -f docker-compose.ci.yml build backend tests
 
       - name: Start services with simple waiting
         run: |
-          docker-compose -f docker-compose.ci.yml up -d
+          docker compose -f docker-compose.ci.yml up -d
           echo "Waiting for services to start..."
           sleep 30
           echo "Checking services status..."
-          docker-compose -f docker-compose.ci.yml ps
+          docker compose -f docker-compose.ci.yml ps
           echo "Backend logs:"
-          docker-compose -f docker-compose.ci.yml logs backend --tail=20
+          docker compose -f docker-compose.ci.yml logs backend --tail=20
 
       - name: Check backend availability
         run: |
@@ -46,7 +46,7 @@ jobs:
 
       - name: Initialize database
         run: |
-          docker-compose -f docker-compose.ci.yml exec backend python -c "
+          docker compose -f docker-compose.ci.yml exec backend python -c "
           try:
               from database.database import engine
               from models.user import Base
@@ -58,8 +58,7 @@ jobs:
 
       - name: Run API tests
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests \
-            python -m pytest api/ -v
+          docker compose -f docker-compose.ci.yml run --rm tests python -m pytest api/ -v
 
       - name: Create simple test report
         if: always()
@@ -81,9 +80,9 @@ jobs:
       - name: Save and upload service logs
         if: always()
         run: |
-          docker-compose -f docker-compose.ci.yml logs > docker-compose-logs.txt
+          docker compose -f docker-compose.ci.yml logs > docker-compose-logs.txt
           echo "Backend Logs" > detailed-logs.txt
-          docker-compose -f docker-compose.ci.yml logs backend >> detailed-logs.txt
+          docker compose -f docker-compose.ci.yml logs backend >> detailed-logs.txt
 
       - name: Upload service logs
         if: always()
@@ -109,13 +108,13 @@ jobs:
 
       - name: Start services for performance tests
         run: |
-          docker-compose -f docker-compose.ci.yml up -d
+          docker compose -f docker-compose.ci.yml up -d
           sleep 30
-          docker-compose -f docker-compose.ci.yml ps
+          docker compose -f docker-compose.ci.yml ps
 
       - name: Run simple performance test
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests bash -c "
+          docker compose -f docker-compose.ci.yml run --rm tests bash -c "
           python -c \"
           import requests
           import time
