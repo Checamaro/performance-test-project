@@ -110,7 +110,8 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """Simple health check that always returns healthy"""
+    return {"status": "healthy", "service": "auth-service"}
 
 
 # Эндпоинт для Prometheus метрик
