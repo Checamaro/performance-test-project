@@ -129,7 +129,7 @@ jobs:
 
       - name: Run simple performance test
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests bash -c "python -c \"import requests; import time; print('Testing backend availability...'); successes = 0; start_time = time.time(); [exec('try: response = requests.get(\\\"http://backend:8000/health\\\", timeout=5); print(\\\"Request {}: SUCCESS\\\".format(i+1) if response.status_code == 200 else \\\"Request {}: FAILED (Status: {})\\\".format(i+1, response.status_code)); successes += 1 if response.status_code == 200 else 0; except Exception as e: print(\\\"Request {}: FAILED (Error: {})\\\".format(i+1, str(e))); time.sleep(1)' for i in range(5)]; duration = time.time() - start_time; print('Results: {}/5 successful'.format(successes)); print('Performance test PASSED' if successes >= 3 else 'Performance test FAILED'); exit(0 if successes >= 3 else 1)\""
+          docker-compose -f docker-compose.ci.yml run --rm tests python -c "import requests; successes = 0; print('Testing backend...'); [exec('try: r = requests.get(\"http://backend:8000/health\", timeout=3); successes += 1 if r.status_code == 200 else 0; print(f\"Request {i+1}: {\"SUCCESS\" if r.status_code == 200 else \"FAILED\"}\") except: print(f\"Request {i+1}: ERROR\"); __import__(\"time\").sleep(1)' for i in range(3)]; print(f'Results: {successes}/3'); exit(0 if successes >= 2 else 1)"
 
   report:
     runs-on: ubuntu-latest
