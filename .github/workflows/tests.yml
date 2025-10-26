@@ -72,32 +72,32 @@ jobs:
       run: |
         mkdir -p allure-report
         cat > allure-report/index.html << 'EOF'
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>API Test Results</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-                .success { color: #155724; background-color: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0; }
-                .info { color: #0c5460; background-color: #d1ecf1; padding: 20px; border-radius: 5px; margin: 20px 0; }
-            </style>
-        </head>
-        <body>
-            <h1>API Test Execution Report</h1>
-            <div class="success">
-                <h2>✓ Tests Executed Successfully</h2>
-                <p>All API tests passed in the CI environment.</p>
-                <p><strong>Note:</strong> Detailed Allure report is available only when running tests locally.</p>
-            </div>
-            <div class="info">
-                <h3>Test Results</h3>
-                <p>Check the workflow logs above for detailed test execution results.</p>
-                <p>To generate full Allure report, run tests locally with:</p>
-                <code>docker-compose run --rm tests python -m pytest api/ -v --alluredir=/tmp/allure-results</code>
-            </div>
-        </body>
-        </html>
-        EOF
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test Results</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+        .success { color: #155724; background-color: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .info { color: #0c5460; background-color: #d1ecf1; padding: 20px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>API Test Execution Report</h1>
+    <div class="success">
+        <h2>✓ Tests Executed Successfully</h2>
+        <p>All API tests passed in the CI environment.</p>
+        <p><strong>Note:</strong> Detailed Allure report is available only when running tests locally.</p>
+    </div>
+    <div class="info">
+        <h3>Test Results</h3>
+        <p>Check the workflow logs above for detailed test execution results.</p>
+        <p>To generate full Allure report, run tests locally with:</p>
+        <code>docker-compose run --rm tests python -m pytest api/ -v --alluredir=/tmp/allure-results</code>
+    </div>
+</body>
+</html>
+EOF
         echo "✓ Simple test report created"
 
     - name: Upload Allure report
@@ -147,39 +147,39 @@ jobs:
     - name: Run simple performance test
       run: |
         docker-compose -f docker-compose.ci.yml run --rm tests python -c "
-        import requests
-        import time
-        import random
-        
-        def test_endpoint():
-            try:
-                response = requests.get('http://backend:8000/health', timeout=5)
-                return response.status_code
-            except:
-                return 0
-        
-        print('Testing backend availability...')
-        successes = 0
-        start_time = time.time()
-        
-        for i in range(5):
-            status = test_endpoint()
-            if status == 200:
-                successes += 1
-                print(f'Request {i+1}: ✓ SUCCESS')
-            else:
-                print(f'Request {i+1}: ✗ FAILED (Status: {status})')
-            time.sleep(1)
-        
-        duration = time.time() - start_time
-        print(f'Results: {successes}/5 successful')
-        
-        if successes >= 3:
-            print('✓ Performance test PASSED')
-        else:
-            print('✗ Performance test FAILED')
-            exit(1)
-        "
+import requests
+import time
+import random
+
+def test_endpoint():
+    try:
+        response = requests.get('http://backend:8000/health', timeout=5)
+        return response.status_code
+    except:
+        return 0
+
+print('Testing backend availability...')
+successes = 0
+start_time = time.time()
+
+for i in range(5):
+    status = test_endpoint()
+    if status == 200:
+        successes += 1
+        print(f'Request {i+1}: ✓ SUCCESS')
+    else:
+        print(f'Request {i+1}: ✗ FAILED (Status: {status})')
+    time.sleep(1)
+
+duration = time.time() - start_time
+print(f'Results: {successes}/5 successful')
+
+if successes >= 3:
+    print('✓ Performance test PASSED')
+else:
+    print('✗ Performance test FAILED')
+    exit(1)
+"
 
   report:
     runs-on: ubuntu-latest
@@ -199,32 +199,33 @@ jobs:
     - name: Verify Allure report download
       run: |
         echo "Checking downloaded Allure report..."
-        if [ -d "allure-report" ]; then
+        if [ -d "allure-report" ] && [ "$(ls -A allure-report)" ]; then
           echo "✓ Allure report downloaded successfully"
           ls -la allure-report/
         else
-          echo "✗ Allure report not found, creating placeholder"
+          echo "Allure report not found, creating placeholder"
           mkdir -p allure-report
           cat > allure-report/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>Test Report - No Data</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-                  .info { color: #0c5460; background-color: #d1ecf1; padding: 20px; border-radius: 5px; }
-              </style>
-          </head>
-          <body>
-              <h1>API Test Report</h1>
-              <div class="info">
-                  <h2>Basic Test Report</h2>
-                  <p>Tests executed successfully in CI environment.</p>
-                  <p>For detailed Allure reports, run tests locally.</p>
-              </div>
-          </body>
-          </html>
-          EOF
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Report - No Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+        .info { color: #0c5460; background-color: #d1ecf1; padding: 20px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>API Test Report</h1>
+    <div class="info">
+        <h2>Basic Test Report</h2>
+        <p>Tests executed successfully in CI environment.</p>
+        <p>For detailed Allure reports, run tests locally.</p>
+    </div>
+</body>
+</html>
+EOF
+          echo "✓ Placeholder report created"
         fi
 
     - name: Setup Pages
