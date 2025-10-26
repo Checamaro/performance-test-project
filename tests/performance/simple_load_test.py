@@ -45,7 +45,7 @@ def run_load_test():
     # Затем запускаем несколько последовательных запросов
     print("2. Testing sequential requests...")
     successes = 0
-    total_requests = 5
+    total_requests = 10
 
     start_time = time.time()
 
@@ -67,7 +67,7 @@ def run_load_test():
     print(f"RPS: {total_requests / duration:.2f}")
 
     # Требуем 70% успешных запросов
-    if successes >= 3:
+    if successes >= 7:
         print("✅ Load test PASSED")
         return True
     else:
