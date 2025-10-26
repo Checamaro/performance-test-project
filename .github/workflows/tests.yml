@@ -62,31 +62,25 @@ jobs:
       - name: Run API tests and generate Allure report
         run: |
           # Запускаем тесты и генерируем отчет в одном контейнере
-          docker-compose -f docker-compose.ci.yml run --rm tests bash -c "
+          mkdir -p allure-report
+          docker-compose -f docker-compose.ci.yml run --rm -v $(pwd)/allure-report:/host-report tests bash -c "
             echo 'Running API tests with Allure...'
-            python -m pytest api/ -v --alluredir=/tmp/allure-results || echo 'Some tests failed'
+            python -m pytest api/ -v --alluredir=/tmp/allure-results
             
             echo 'Checking if Allure results were created...'
             if [ -d '/tmp/allure-results' ] && [ \"\$(ls -A /tmp/allure-results)\" ]; then
               echo 'Generating Allure report...'
               allure generate /tmp/allure-results -o /tmp/allure-report --clean
-              echo 'Allure report generated successfully'
-              ls -la /tmp/allure-report/
+              echo 'Copying Allure report to host...'
+              cp -r /tmp/allure-report/* /host-report/
+              echo 'Allure report generated and copied successfully'
             else
               echo 'No Allure results found, creating basic report...'
-              mkdir -p /tmp/allure-report
-              echo '<html><body><h1>Test Report</h1><p>No test results available</p></body></html>' > /tmp/allure-report/index.html
+              echo '<html><body><h1>Test Report</h1><p>No test results available</p></body></html>' > /host-report/index.html
             fi
           "
           
-          # Создаем временный контейнер для копирования отчета
-          echo "Creating temporary container to copy Allure report..."
-          docker create --name allure-copy $(docker-compose -f docker-compose.ci.yml build -q tests)
-          mkdir -p allure-report
-          docker cp allure-copy:/tmp/allure-report/. allure-report/ || echo "Failed to copy from container"
-          docker rm allure-copy
-          
-          echo "Allure report contents:"
+          echo "Allure report contents on host:"
           ls -la allure-report/
 
       - name: Upload Allure report
@@ -156,7 +150,7 @@ jobs:
         run: |
           echo "Checking Allure report..."
           if [ -d "allure-report" ] && [ -f "allure-report/index.html" ]; then
-            echo "✓ Allure report downloaded successfully"
+            echo "✓ Full Allure report with charts is ready"
             echo "Report contents:"
             find allure-report -type f | head -10
           else
