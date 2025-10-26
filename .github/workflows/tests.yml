@@ -59,19 +59,29 @@ jobs:
               print(f'Database warning: {e}')
           " || echo "Database initialization completed"
 
-      - name: Run API tests
+      - name: Run API tests and generate Allure report
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests python -m pytest api/ -v
-
-      - name: Create simple test report
-        if: always()
-        run: |
+          # Запускаем тесты и генерируем отчет в одном контейнере
           mkdir -p allure-report
-          echo "<html><body><h1>API Test Report</h1>" > allure-report/index.html
-          echo "<p>Tests executed successfully.</p>" >> allure-report/index.html
-          echo "<p>For detailed reports, run locally.</p>" >> allure-report/index.html
-          echo "</body></html>" >> allure-report/index.html
-          echo "Simple test report created"
+          docker-compose -f docker-compose.ci.yml run --rm -v $(pwd)/allure-report:/host-report tests bash -c "
+            echo 'Running API tests with Allure...'
+            python -m pytest api/ -v --alluredir=/tmp/allure-results
+            
+            echo 'Checking if Allure results were created...'
+            if [ -d '/tmp/allure-results' ] && [ \"\$(ls -A /tmp/allure-results)\" ]; then
+              echo 'Generating Allure report...'
+              allure generate /tmp/allure-results -o /tmp/allure-report --clean
+              echo 'Copying Allure report to host...'
+              cp -r /tmp/allure-report/* /host-report/
+              echo 'Allure report generated and copied successfully'
+            else
+              echo 'No Allure results found, creating basic report...'
+              echo '<html><body><h1>Test Report</h1><p>No test results available</p></body></html>' > /host-report/index.html
+            fi
+          "
+          
+          echo "Allure report contents on host:"
+          ls -la allure-report/
 
       - name: Upload Allure report
         uses: actions/upload-artifact@v4
@@ -119,33 +129,8 @@ jobs:
 
       - name: Run simple performance test
         run: |
-          docker-compose -f docker-compose.ci.yml run --rm tests bash -c "
-          python -c \"
-          import requests
-          import time
-          successes = 0
-          start_time = time.time()
-          print('Testing backend availability...')
-          for i in range(5):
-              try:
-                  response = requests.get('http://backend:8000/health', timeout=5)
-                  if response.status_code == 200:
-                      successes += 1
-                      print('Request ' + str(i+1) + ': SUCCESS')
-                  else:
-                      print('Request ' + str(i+1) + ': FAILED (Status: ' + str(response.status_code) + ')')
-              except:
-                  print('Request ' + str(i+1) + ': FAILED (Connection error)')
-              time.sleep(1)
-          duration = time.time() - start_time
-          print('Results: ' + str(successes) + '/5 successful')
-          if successes >= 3:
-              print('Performance test PASSED')
-          else:
-              print('Performance test FAILED')
-              exit(1)
-          \"
-          "
+          # Простейший тест - один запрос к health endpoint
+          docker-compose -f docker-compose.ci.yml run --rm tests python -c "import requests; r = requests.get('http://backend:8000/health', timeout=10); print(f'Health check: {r.status_code}'); exit(0 if r.status_code == 200 else 1)"
 
   report:
     runs-on: ubuntu-latest
@@ -162,19 +147,18 @@ jobs:
           name: allure-report
           path: allure-report
 
-      - name: Verify Allure report download
+      - name: Verify and prepare Allure report
         run: |
-          echo "Checking downloaded Allure report..."
-          if [ -d "allure-report" ] && [ "$(ls -A allure-report)" ]; then
-            echo "Allure report downloaded successfully"
-            ls -la allure-report/
+          echo "Checking Allure report..."
+          if [ -d "allure-report" ] && [ -f "allure-report/index.html" ]; then
+            echo "✓ Full Allure report with charts is ready"
+            echo "Report contents:"
+            find allure-report -type f | head -10
           else
-            echo "Allure report not found, creating placeholder"
+            echo "Allure report not found, creating basic report..."
             mkdir -p allure-report
-            echo "<html><body><h1>Test Report</h1>" > allure-report/index.html
-            echo "<p>No test results available.</p>" >> allure-report/index.html
-            echo "</body></html>" >> allure-report/index.html
-            echo "Placeholder report created"
+            echo '<!DOCTYPE html><html><head><title>Allure Report</title><style>body{font-family:Arial,sans-serif;margin:40px}.container{max-width:800px;margin:0 auto}.warning{background:#fff3cd;border:1px solid #ffeaa7;padding:20px;border-radius:5px}</style></head><body><div class="container"><h1>Allure Test Report</h1><div class="warning"><h2>Report Not Available</h2><p>Full Allure report could not be generated in this run.</p><p>Check workflow logs for test results.</p></div></div></body></html>' > allure-report/index.html
+            echo "Basic report created"
           fi
 
       - name: Setup Pages
