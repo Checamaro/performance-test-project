@@ -212,3 +212,21 @@ class TestAuthAPI:
             data = response.json()
             assert "detail" in data
             assert "incorrect" in data["detail"].lower()
+
+    @allure.story("Performance")
+    @allure.title("Test simple registration endpoint")
+    def test_simple_registration(self):
+        """Test the simplified registration endpoint for performance testing"""
+        email = f"simple_perf_{random.randint(10000, 99999)}@example.com"
+
+        response = requests.post(
+            f"{BASE_URL}/register-simple",
+            json={"email": email, "password": "simplepass123"},
+            timeout=10
+        )
+
+        # Принимаем любой успешный статус
+        assert response.status_code in [200,
+                                        201], f"Expected 200 or 201, got {response.status_code}. Response: {response.text}"
+        data = response.json()
+        assert data["email"] == email
