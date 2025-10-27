@@ -1,0 +1,7 @@
+"Status","Start Time","Stop Time","Duration in ms","Parent Suite","Suite","Sub Suite","Test Class","Test Method","Name","Description"
+"passed","Mon Oct 27 18:50:57 UTC 2025","Mon Oct 27 18:50:57 UTC 2025","250","api","test_auth_api","TestAuthAPI","","","Test successful user registration",""
+"passed","Mon Oct 27 18:50:58 UTC 2025","Mon Oct 27 18:50:58 UTC 2025","506","api","test_auth_api","TestAuthAPI","","","Test access to protected endpoint with valid token",""
+"passed","Mon Oct 27 18:50:57 UTC 2025","Mon Oct 27 18:50:58 UTC 2025","502","api","test_auth_api","TestAuthAPI","","","Test successful user login",""
+"passed","Mon Oct 27 18:50:58 UTC 2025","Mon Oct 27 18:50:59 UTC 2025","254","api","test_auth_api","TestAuthAPI","","","Test registration with existing email",""
+"passed","Mon Oct 27 18:50:59 UTC 2025","Mon Oct 27 18:50:59 UTC 2025","3","api","test_auth_api","TestAuthAPI","","","Test simple registration endpoint","Test the simplified registration endpoint for performance testing"
+"passed","Mon Oct 27 18:50:59 UTC 2025","Mon Oct 27 18:50:59 UTC 2025","497","api","test_auth_api","TestAuthAPI","","","Test login with invalid credentials",""
