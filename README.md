@@ -97,3 +97,11 @@ node-exporter	9100	Системные метрики
 
 9. **Проблемы с портами**
 Если порт занят, измените его в docker-compose.yml
+
+## 📊 Test Reports
+
+### Latest Allure Report
+[![Allure Report](https://img.shields.io/badge/Allure_Report-View_Online-green.svg)](https://checamaro.github.io/performance-test-project/)
+
+### GitHub Actions
+[![Tests](https://github.com/Checamaro/performance-test-project/actions/workflows/tests.yml/badge.svg)](https://github.com/Checamaro/performance-test-project/actions)
