@@ -4,13 +4,34 @@
 
 ## Архитектура
 
-Frontend (React) → Backend (FastAPI) → PostgreSQL
-↓ ↓
-Selenium Tests Kafka Broker
-↓ ↓
-Allure Reports Monitoring Consumer
-↓ ↓
-Prometheus ←→ Grafana
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Frontend  │────│   Backend   │────│  PostgreSQL │
+│   (React)   │    │  (FastAPI)  │    │             │
+└──────┬──────┘    └──────┬──────┘    └─────────────┘
+       │                  │
+       │                  │
+┌──────▼──────┐    ┌──────▼──────┐
+│ Selenium    │    │   Kafka     │
+│   Tests     │    │   Broker    │
+└──────┬──────┘    └──────┬──────┘
+       │                  │
+       │                  │
+┌──────▼──────┐    ┌──────▼──────┐
+│  Allure     │    │ Monitoring  │
+│  Reports    │    │  Consumer   │
+└──────┬──────┘    └──────┬──────┘
+       │                  │
+       └───────┐    ┌─────┘
+               │    │
+         ┌─────▼────▼────┐
+         │  Prometheus   │◄───┐
+         └───────┬───────┘    │
+                 │            │
+             ┌───▼───┐        │
+             │Grafana│────────┘
+             └───────┘
+```
 
 ## 🛠️ Технологический стек
 
@@ -56,16 +77,18 @@ E2E тесты: Selenium (в разработке)
 Интеграционные тесты: Kafka + PostgreSQL
 
 5. **Docker сервисы**:
-Сервис	        Порт	Назначение
-backend	        8000	FastAPI приложение
-frontend	    80	    React приложение
-postgres	    5432	База данных
-kafka	        9092	Брокер сообщений
-zookeeper	    2181	Координатор Kafka
-locust	        8089	Нагрузочное тестирование
-prometheus	    9091	Сбор метрик
-grafana	        3000	Визуализация метрик
-node-exporter	9100	Системные метрики
+
+| Сервис | Порт | Назначение |
+|--------|------|------------|
+| backend | 8000 | FastAPI приложение |
+| frontend | 80 | React приложение |
+| postgres | 5432 | База данных |
+| kafka | 9092 | Брокер сообщений |
+| zookeeper | 2181 | Координатор Kafka |
+| locust | 8089 | Нагрузочное тестирование |
+| prometheus | 9091 | Сбор метрик |
+| grafana | 3000 | Визуализация метрик |
+| node-exporter | 9100 | Системные метрики |
 
 6. **Запуск тестов**:
 
