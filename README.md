@@ -21,7 +21,7 @@ Prometheus ←→ Grafana
 - **Тестирование**: pytest, Locust, Selenium, Allure Reports
 - **Мониторинг**: Prometheus, Grafana, Node Exporter
 - **Контейнеризация**: Docker, Docker Compose
-- **CI/CD**: GitLab CI (готовность)
+- **CI/CD**: Github Actions
 
 ## 🚀 Быстрый старт
 
